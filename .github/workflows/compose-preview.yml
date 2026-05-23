@@ -1,0 +1,91 @@
+name: Compose Preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+  workflow_dispatch:
+    inputs:
+      cleanup_stale_hours:
+        description: Stop previews older than this many hours
+        required: false
+        default: "24"
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: compose-preview-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  PREVIEW_PATH: ./demo
+
+jobs:
+  preview:
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - id: preview
+        name: Create compose preview
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: |
+          uv run modal run preview.py \
+            --path "$PREVIEW_PATH" \
+            --repo "${{ github.repository }}" \
+            --pr "${{ github.event.pull_request.number }}" \
+            --branch "${{ github.event.pull_request.head.ref }}" \
+            --ref "${{ github.event.pull_request.head.ref }}" \
+            --commit "${{ github.event.pull_request.head.sha }}" \
+            --comment
+
+      - name: Summarize preview
+        run: |
+          {
+            echo "### Compose preview"
+            echo
+            echo "Preview: ${{ steps.preview.outputs.preview_url }}"
+            echo
+            echo "Health: ${{ steps.preview.outputs.health }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  teardown:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Stop compose preview
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: |
+          uv run modal run preview.py \
+            --repo "${{ github.repository }}" \
+            --stop-pr "${{ github.event.pull_request.number }}"
+
+  cleanup-stale:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Stop stale compose previews
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: |
+          uv run modal run preview.py \
+            --cleanup-stale-hours "${{ inputs.cleanup_stale_hours }}"
