@@ -1,0 +1,16 @@
+[project]
+name = "modal-sandbox-docker-compose"
+version = "0.1.0"
+description = "Live docker compose preview environments inside Modal Sandboxes."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "modal>=1.0.0",
+]
+
+[tool.uv]
+package = true
+
+[tool.setuptools]
+packages = ["modal_app"]
+py-modules = ["preview"]
