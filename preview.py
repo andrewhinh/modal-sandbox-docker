@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import modal
 
+from modal_app.eval import agent_eval as run_agent_eval
 from modal_app.github import upsert_pr_comment, write_github_outputs
 from modal_app.lifecycle import (
     benchmark as run_benchmark,
@@ -36,6 +37,11 @@ def main(
     comment: bool = False,
     benchmark: bool = False,
     runs: int = 3,
+    agent_eval: bool = False,
+    eval_preview_id: str = "",
+    eval_task: str = "demo-title",
+    eval_command: str = "",
+    eval_runs: int = 1,
 ) -> None:
     if list:
         print_preview_table()
@@ -63,6 +69,17 @@ def main(
         raise ValueError("--repo is required with --pr")
     if benchmark:
         run_benchmark(path, branch, runs)
+        return
+    if agent_eval:
+        run_agent_eval(
+            path,
+            branch,
+            leave_running,
+            eval_preview_id=eval_preview_id,
+            eval_task=eval_task,
+            eval_command=eval_command,
+            eval_runs=eval_runs,
+        )
         return
 
     metadata = create_preview(
